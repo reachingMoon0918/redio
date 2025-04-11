@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>手机摄像头调用</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            text-align: center;
+        }
+        #cameraView {
+            width: 100%;
+            max-width: 500px;
+            height: auto;
+            background-color: #f0f0f0;
+            margin: 20px 0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        #captureBtn {
+            padding: 12px 24px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        #photoResult {
+            width: 100%;
+            max-width: 500px;
+            height: auto;
+            display: none;
+            border-radius: 8px;
+        }
+        .btn-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .switch-btn {
+            padding: 10px 15px;
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>摄像头调用演示</h1>
+
+    <video id="cameraView" autoplay playsinline></video>
+
+    <div class="btn-container">
+        <button id="switchCameraBtn" class="switch-btn">切换摄像头</button>
+        <button id="toggleFlashBtn" class="switch-btn">闪光灯</button>
+    </div>
+
+    <button id="captureBtn">拍照</button>
+
+    <canvas id="photoCanvas" style="display:none;"></canvas>
+    <img id="photoResult" alt="拍摄结果">
+
+    <script>
+        // 获取DOM元素
+        const video = document.getElementById('cameraView');
+        const captureBtn = document.getElementById('captureBtn');
+        const switchCameraBtn = document.getElementById('switchCameraBtn');
+        const toggleFlashBtn = document.getElementById('toggleFlashBtn');
+        const photoCanvas = document.getElementById('photoCanvas');
+        const photoResult = document.getElementById('photoResult');
+
+        let stream = null;
+        let facingMode = "environment"; // 默认后置摄像头
+        let flashOn = false;
+
+        // 启动摄像头
+        async function startCamera() {
+            try {
+                // 停止之前的流
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                }
+
+                const constraints = {
+                    video: {
+                        facingMode: facingMode,
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                };
+                console.log(navigator);
+
+                // 获取媒体流
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = stream;
+
+                // 检查设备是否有闪光灯
+                checkFlashSupport();
+            } catch (err) {
+                console.error("摄像头错误:", err);
+                alert("无法访问摄像头: " + err.message);
+            }
+        }
+
+        // 拍照
+        function capturePhoto() {
+            // 设置canvas尺寸与视频相同
+            photoCanvas.width = video.videoWidth;
+            photoCanvas.height = video.videoHeight;
+
+            // 绘制当前视频帧到canvas
+            const ctx = photoCanvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, photoCanvas.width, photoCanvas.height);
+
+            // 将canvas内容转换为图片并显示
+            photoResult.src = photoCanvas.toDataURL('image/png');
+            photoResult.style.display = 'block';
+
+            // 隐藏视频元素
+            video.style.display = 'none';
+
+            // 更改按钮文本
+            captureBtn.textContent = '重新拍摄';
+        }
+
+        // 重新开始摄像头
+        function restartCamera() {
+            video.style.display = 'block';
+            photoResult.style.display = 'none';
+            captureBtn.textContent = '拍照';
+        }
+
+        // 切换摄像头
+        function switchCamera() {
+            facingMode = facingMode === "user" ? "environment" : "user";
+            startCamera();
+        }
+
+        // 检查设备是否支持闪光灯
+        function checkFlashSupport() {
+            // 在实际应用中，可能需要使用特定API或库来检测闪光灯支持
+            // 这里只是一个简单的演示
+            toggleFlashBtn.disabled = true;
+            if (facingMode === "environment" && 'torch' in navigator.mediaDevices.getSupportedConstraints()) {
+                toggleFlashBtn.disabled = false;
+            }
+        }
+
+        // 切换闪光灯
+        async function toggleFlash() {
+            try {
+                if (!stream) return;
+
+                const track = stream.getVideoTracks()[0];
+                if (!track) return;
+
+                await track.applyConstraints({
+                    advanced: [{ torch: flashOn }]
+                });
+
+                flashOn = !flashOn;
+                toggleFlashBtn.textContent = flashOn ? '关闭闪光灯' : '闪光灯';
+            } catch (err) {
+                console.error("闪光灯错误:", err);
+            }
+        }
+
+        // 事件监听
+        captureBtn.addEventListener('click', function() {
+            if (video.style.display !== 'none') {
+                capturePhoto();
+            } else {
+                restartCamera();
+            }
+        });
+
+        switchCameraBtn.addEventListener('click', switchCamera);
+        toggleFlashBtn.addEventListener('click', toggleFlash);
+
+        // 页面加载时启动摄像头
+        window.addEventListener('DOMContentLoaded', startCamera);
+    </script>
+</body>
+</html>
